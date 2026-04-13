@@ -1,6 +1,51 @@
 /// <reference types="vite/client" />
 import type { CameraStore } from './types'
 import { log } from './debug'
+import splashUrl from './assets/highway--v2.jpg'
+
+// Encode the bundled splash image to PNG bytes for the glasses display.
+// Loads via Image element directly (no fetch) so it works in packaged WebViews
+// where fetch() for local bundled assets may be restricted.
+// Times out after 3s so boot is never blocked.
+export function encodeSplashImage(): Promise<number[]> {
+  log(`[splash] encoding local asset: ${splashUrl}`)
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      log('[splash] timed out after 3s')
+      reject(new Error('Splash image load timed out'))
+    }, 3000)
+
+    const img = new Image()
+    img.onload = () => {
+      clearTimeout(timer)
+      const canvas = document.createElement('canvas')
+      canvas.width = 200
+      canvas.height = 100
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('canvas 2d context unavailable')); return }
+      ctx.drawImage(img, 0, 0, 200, 100)
+      canvas.toBlob(
+        (b) => {
+          if (!b) { reject(new Error('toBlob returned null')); return }
+          b.arrayBuffer()
+            .then((ab) => {
+              const data = Array.from(new Uint8Array(ab))
+              log(`[splash] encoded — ${data.length} bytes`)
+              resolve(data)
+            })
+            .catch(reject)
+        },
+        'image/png'
+      )
+    }
+    img.onerror = () => {
+      clearTimeout(timer)
+      log('[splash] Image element onerror fired')
+      reject(new Error('Splash image failed to load'))
+    }
+    img.src = splashUrl
+  })
+}
 
 // In dev mode (QR / npm run dev) the Even App loads the page without reading
 // app.json, so no network permissions are granted and all external fetch()
@@ -14,10 +59,14 @@ const WSDOT_BASE = IS_DEV
 
 log(`[api] mode=${IS_DEV ? 'dev (proxied)' : 'prod (direct)'} base=${WSDOT_BASE}`)
 
-function toImageURL(raw: string): string {
-  if (!IS_DEV) return raw
-  // https://images.wsdot.wa.gov/path/to/img.jpg → /proxy/images/path/to/img.jpg
-  return raw.replace('https://images.wsdot.wa.gov', '/proxy/images')
+// Rewrites image URLs for the current environment at fetch time.
+// In dev: proxy through Vite. In prod: ensure canonical URLs (fixes stale dev cache).
+function toFetchURL(raw: string): string {
+  if (IS_DEV) {
+    return raw.replace('https://images.wsdot.wa.gov', '/proxy/images')
+  }
+  // Production — fix any stale proxied URLs left in localStorage from dev sessions
+  return raw.replace(/^\/proxy\/images/, 'https://images.wsdot.wa.gov')
 }
 
 interface WSDOTCamera {
@@ -67,7 +116,7 @@ export async function fetchAllCameras(accessCode: string): Promise<CameraStore> 
     store[road].push({
       cameraID: cam.CameraID,
       title: cam.Title,
-      imageURL: toImageURL(cam.ImageURL),
+      imageURL: cam.ImageURL,
     })
   }
 
@@ -135,11 +184,12 @@ export async function fetchCameraImageTiledFresh(imageURL: string): Promise<numb
 }
 
 export async function fetchCameraImageTiled(imageURL: string): Promise<number[][]> {
-  log(`[fetch] GET (tiled) ${imageURL}`)
+  const url = toFetchURL(imageURL)
+  log(`[fetch] GET (tiled) ${url}`)
 
   let res: Response
   try {
-    res = await fetch(imageURL)
+    res = await fetch(url)
   } catch (err) {
     const name = err instanceof Error ? err.name : 'UnknownError'
     const msg  = err instanceof Error ? err.message : String(err)
@@ -211,11 +261,12 @@ export async function fetchCameraImageTiled(imageURL: string): Promise<number[][
 }
 
 export async function fetchCameraImageData(imageURL: string): Promise<number[]> {
-  log(`[fetch] GET ${imageURL}`)
+  const url = toFetchURL(imageURL)
+  log(`[fetch] GET ${url}`)
 
   let res: Response
   try {
-    res = await fetch(imageURL)
+    res = await fetch(url)
   } catch (err) {
     const name = err instanceof Error ? err.name : 'UnknownError'
     const msg  = err instanceof Error ? err.message : String(err)

@@ -9,9 +9,11 @@ export type CameraStore = Record<string, CameraEntry[]>
 
 export type AppState =
   | { name: 'setup' }
+  | { name: 'menu'; menuIndex: number }
   | { name: 'highway-list'; highways: string[]; page: number }
   | { name: 'camera-browse'; highway: string; cameras: CameraEntry[]; cameraIndex: number }
   | { name: 'camera-view'; highway: string; cameras: CameraEntry[]; cameraIndex: number }
+  | { name: 'quad-view'; page: number }
 
 // Max real items per list page.
 // Worst case: PREV(1) + 18 items + NEXT(1) = 20 (SDK hard limit).
@@ -19,6 +21,13 @@ export const LIST_PAGE_SIZE = 18
 
 export const NEXT_LABEL = '\u2192 Next Page'
 export const PREV_LABEL = '\u2190 Prev Page'
+
+export const MENU_BROWSE = '  Browse'
+export const MENU_QUAD   = '  Favorites'
+export const MENU_ITEMS  = [MENU_QUAD, MENU_BROWSE] as const
+
+// Number of favorite cameras shown per quad-view page
+export const QUAD_PAGE_SIZE = 4
 
 // Container IDs.
 // IMAGE-RENDERING.md requires the image container to be ID 2 with containerTotalNum=2.
@@ -32,6 +41,8 @@ export const CONTAINER = {
   IMAGE_TR:     3, // full-view tile: top-right
   IMAGE_BL:     4, // full-view tile: bottom-left
   IMAGE_BR:     5, // full-view tile: bottom-right
+  MENU_LOGO:    2, // menu logo image (left side)
+  MENU_TEXT:    3, // menu item text (right side)
 } as const
 
 export const CONTAINER_NAMES = {
@@ -42,6 +53,8 @@ export const CONTAINER_NAMES = {
   IMAGE_TR:     'cam-tr',
   IMAGE_BL:     'cam-bl',
   IMAGE_BR:     'cam-br',
+  MENU_LOGO:    'menu-logo',
+  MENU_TEXT:    'menu-text',
 } as const
 
 // Full-view tile layout — 2×2 grid of 200×100 tiles centered on 576×288 canvas.

@@ -12,6 +12,7 @@
     "vite": "^8.0.3"
   },
   "devDependencies": {
+    "@evenrealities/evenhub-cli": "^0.1.11",
     "@vitejs/plugin-basic-ssl": "^2.3.0"
   }
 }

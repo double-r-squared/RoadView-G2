@@ -230,6 +230,130 @@
       color: #aaa;
       background: #222;
     }
+
+    /* ── Favorites picker ── */
+    #favorites-card {
+      background: #1a1a1a;
+      border: 1px solid #2e2e2e;
+      border-radius: 12px;
+      padding: 0;
+      width: 100%;
+      max-width: 440px;
+      overflow: hidden;
+    }
+
+    #favorites-card.hidden { display: none; }
+
+    #favorites-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    #favorites-count {
+      color: #4a9eff;
+      font-weight: 400;
+      font-size: 0.85rem;
+    }
+
+    .toggle-icon {
+      font-size: 0.6rem;
+      transition: transform 0.2s;
+    }
+
+    #favorites-card.collapsed .toggle-icon {
+      transform: rotate(-90deg);
+    }
+
+    .favorites-hint {
+      font-size: 0.72rem;
+      color: #666;
+      line-height: 1.4;
+      padding: 0 20px 12px;
+    }
+
+    #favorites-card.collapsed .favorites-hint,
+    #favorites-card.collapsed #favorites-body {
+      display: none;
+    }
+
+    #favorites-body {
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 0 12px 12px;
+    }
+
+    .fav-highway {
+      margin-bottom: 4px;
+    }
+
+    .fav-highway-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #ccc;
+      border-radius: 6px;
+    }
+
+    .fav-highway-header:hover {
+      background: #222;
+    }
+
+    .fav-highway-header .hw-arrow {
+      font-size: 0.55rem;
+      transition: transform 0.15s;
+      color: #666;
+    }
+
+    .fav-highway.collapsed .hw-arrow {
+      transform: rotate(-90deg);
+    }
+
+    .fav-highway.collapsed .fav-camera-list {
+      display: none;
+    }
+
+    .fav-camera-list {
+      padding-left: 20px;
+    }
+
+    .fav-camera {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .fav-camera:hover {
+      background: #1e1e1e;
+    }
+
+    .fav-camera input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: #4a9eff;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .fav-camera label {
+      font-size: 0.75rem;
+      color: #aaa;
+      cursor: pointer;
+      line-height: 1.3;
+    }
   </style>
 </head>
 <body>
@@ -265,8 +389,22 @@
         <span style="font-size:0.85rem;font-weight:600;">Full Image View</span>
       </label>
       <div style="font-size:0.72rem;color:#666;line-height:1.4;">
-        Tiles the image across four 200×100 containers for a larger view.
+        Tiles the image across four 200&times;100 containers for a larger view.
         Loads will be slower and you may see screen tearing as tiles arrive one by one.
+      </div>
+    </div>
+
+    <!-- Favorites picker — appears after cameras are loaded -->
+    <div id="favorites-card" class="hidden">
+      <div id="favorites-header">
+        <span>Favorites <span id="favorites-count">(0)</span></span>
+        <span id="favorites-toggle-icon" class="toggle-icon">&#9660;</span>
+      </div>
+      <div class="favorites-hint">
+        Select cameras for Quad View. Pick up to any number &mdash; they'll be paged 4 at a time on the glasses.
+      </div>
+      <div id="favorites-body">
+        <div id="favorites-tree"></div>
       </div>
     </div>
   </div>

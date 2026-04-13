@@ -17,6 +17,7 @@ import {
   CONTAINER_NAMES,
   FULL_VIEW_TILES,
   LIST_PAGE_SIZE,
+  MENU_ITEMS,
   NEXT_LABEL,
   PREV_LABEL,
   type CameraEntry,
@@ -36,12 +37,47 @@ export async function getBridge(): Promise<EvenAppBridge> {
   return _bridge
 }
 
-// ─── Serial image send queue ──────────────────────────────────────────────────
+// ─── Time display ────────────────────────────────────────────────────────────
+// Shown in the top-right corner of every view (except highway list, where
+// adding a second container breaks list events).
 
-let _sendQueue = Promise.resolve()
+let _timeContainerID = 0
+const TIME_CONTAINER_NAME = 'time'
 
-function enqueueImageSend(fn: () => Promise<void>): void {
-  _sendQueue = _sendQueue.then(fn).catch((err) => log(`Image send error: ${err}`))
+let _labelContainerID = 0
+const LABEL_CONTAINER_NAME = 'label'
+
+function formatTime(): string {
+  const now = new Date()
+  return now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+function makeTimeContainer(id: number): TextContainerProperty {
+  _timeContainerID = id
+  return new TextContainerProperty({
+    containerID: id,
+    containerName: TIME_CONTAINER_NAME,
+    xPosition: 250,
+    yPosition: 4,
+    width: 130,
+    height: 30,
+    isEventCapture: 0,
+    content: formatTime(),
+    paddingLength: 0,
+  })
+}
+
+export async function updateTime(): Promise<void> {
+  if (_timeContainerID === 0) return
+  const bridge = await getBridge()
+  const text = formatTime()
+  await bridge.textContainerUpgrade(new TextContainerUpgrade({
+    containerID: _timeContainerID,
+    containerName: TIME_CONTAINER_NAME,
+    contentOffset: 0,
+    contentLength: text.length,
+    content: text,
+  }))
 }
 
 // ─── Page helper ─────────────────────────────────────────────────────────────
@@ -97,7 +133,7 @@ export async function showHighwayList(highways: string[], page: number): Promise
   if (hasPrev) items.push(PREV_LABEL)
   items.push(...slice)
   if (hasNext) items.push(NEXT_LABEL)
-
+// MARK: HERE
   const list = new ListContainerProperty({
     containerID: CONTAINER.EVENT_TEXT,
     containerName: CONTAINER_NAMES.EVENT_TEXT,
@@ -115,6 +151,8 @@ export async function showHighwayList(highways: string[], page: number): Promise
   })
 
   await setPage({ containerTotalNum: 1, listObject: [list] })
+  _timeContainerID = 0  // list must be sole container — no time display
+  _labelContainerID = 0
   log(`Highway list page ${page}: ${items.length} items`)
 }
 
@@ -156,8 +194,8 @@ export async function showCameraBrowse(
   })
 
   await setPage({
-    containerTotalNum: 2,
-    textObject: [evtContainer, displayContainer],
+    containerTotalNum: 3,
+    textObject: [evtContainer, displayContainer, makeTimeContainer(3)],
   })
   log(`Camera browse: ${highway} [${cameraIndex + 1}/${cameras.length}]`)
 }
@@ -184,6 +222,268 @@ function buildBrowseText(highway: string, idx: number, total: number, title: str
   return `${highway}\nCamera ${idx + 1} / ${total}\n${title}\nID: ${cameraID}`
 }
 
+// ─── Main page layout (splash + menu share the same 3-container setup) ──────
+// ID 1: invisible full-screen event capture (receives scroll/click)
+// ID 2: logo image at top
+// ID 3: visible text — NOT event capture (avoids scroll bounce)
+//
+// Splash sets text to "tap to start". Menu sets it to "> Quad View / Browse".
+// Transitioning between them is just a textContainerUpgrade on ID 3 — no rebuild,
+// no image re-send.
+
+export async function showSplash(imageData: number[]): Promise<void> {
+  const evtContainer = new TextContainerProperty({
+    containerID: CONTAINER.EVENT_TEXT,
+    containerName: CONTAINER_NAMES.EVENT_TEXT,
+    xPosition: 0,
+    yPosition: 0,
+    width: 576,
+    height: 288,
+    isEventCapture: 1,
+    content: ' ',
+    paddingLength: 0,
+  })
+
+  const textObj = new TextContainerProperty({
+    containerID: CONTAINER.MENU_TEXT,
+    containerName: CONTAINER_NAMES.MENU_TEXT,
+    xPosition: 230,
+    yPosition: 120,
+    width: 300,
+    height: 120,
+    isEventCapture: 0,
+    content: '  tap to start',
+    paddingLength: 8,
+  })
+
+  const imageObj = new ImageContainerProperty({
+    containerID: CONTAINER.MENU_LOGO,
+    containerName: CONTAINER_NAMES.MENU_LOGO,
+    xPosition: 180,
+    yPosition: 30,
+    width: 200,
+    height: 100,
+  })
+
+  const ok = await setPage({
+    containerTotalNum: 4,
+    textObject: [evtContainer, textObj, makeTimeContainer(4)],
+    imageObject: [imageObj],
+  })
+
+  if (ok && imageData.length > 0) {
+    const bridge = await getBridge()
+    const result = await bridge.updateImageRawData(new ImageRawDataUpdate({
+      containerID: CONTAINER.MENU_LOGO,
+      containerName: CONTAINER_NAMES.MENU_LOGO,
+      imageData,
+    }))
+    log(`Splash screen: ${result}`)
+  }
+}
+
+// Full page rebuild — used when returning from a sub-view (highway list, camera, quad).
+// Re-sends the image since the page layout was destroyed by the sub-view.
+
+export async function showMenu(imageData: number[], menuIndex: number): Promise<void> {
+  // Clear stale text from previous view BEFORE rebuilding (e.g. "Page 1/2" from quad view).
+  // Must happen while the old page is still active so the SDK actually processes the clear.
+  const bridge = await getBridge()
+  await bridge.textContainerUpgrade(new TextContainerUpgrade({
+    containerID: CONTAINER.EVENT_TEXT,
+    containerName: CONTAINER_NAMES.EVENT_TEXT,
+    contentOffset: 0,
+    contentLength: 40,
+    content: ' '.repeat(40),
+  }))
+
+  const evtContainer = new TextContainerProperty({
+    containerID: CONTAINER.EVENT_TEXT,
+    containerName: CONTAINER_NAMES.EVENT_TEXT,
+    xPosition: 0,
+    yPosition: 0,
+    width: 576,
+    height: 288,
+    isEventCapture: 1,
+    content: ' ',
+    paddingLength: 0,
+  })
+
+  const menuText = new TextContainerProperty({
+    containerID: CONTAINER.MENU_TEXT,
+    containerName: CONTAINER_NAMES.MENU_TEXT,
+    xPosition: 240,
+    yPosition: 120,
+    width: 300,
+    height: 120,
+    isEventCapture: 0,
+    content: buildMenuText(menuIndex),
+    paddingLength: 8,
+  })
+
+  const imageObj = new ImageContainerProperty({
+    containerID: CONTAINER.MENU_LOGO,
+    containerName: CONTAINER_NAMES.MENU_LOGO,
+    xPosition: 188,
+    yPosition: 30,
+    width: 200,
+    height: 100,
+  })
+
+  await setPage({
+    containerTotalNum: 4,
+    textObject: [evtContainer, menuText, makeTimeContainer(4)],
+    imageObject: [imageObj],
+  })
+
+  if (imageData.length > 0) {
+    const result = await bridge.updateImageRawData(new ImageRawDataUpdate({
+      containerID: CONTAINER.MENU_LOGO,
+      containerName: CONTAINER_NAMES.MENU_LOGO,
+      imageData,
+    }))
+    log(`Menu logo: ${result}`)
+  }
+
+  log(`Menu displayed — index ${menuIndex}`)
+}
+
+// Text-only update for the visible text container (MENU_TEXT, ID 3).
+// Works for both splash and menu since they share the same layout.
+export async function updateMenuText(text: string): Promise<void> {
+  const bridge = await getBridge()
+  const ok = await bridge.textContainerUpgrade(new TextContainerUpgrade({
+    containerID: CONTAINER.MENU_TEXT,
+    containerName: CONTAINER_NAMES.MENU_TEXT,
+    contentOffset: 0,
+    contentLength: text.length,
+    content: text,
+  }))
+  log(`Menu text update (${ok}): ${text.replace(/\n/g, ' | ')}`)
+}
+
+export function buildMenuText(menuIndex: number): string {
+  return MENU_ITEMS.map((item, i) =>
+    i === menuIndex ? `>${item}` : `  ${item}`
+  ).join('\n')
+}
+
+// ─── Centered text page ─────────────────────────────────────────────────────
+// Simple 2-container page: invisible event capture + centered visible text.
+// Used for status messages like "No favorites".
+
+export async function showCenteredText(text: string): Promise<void> {
+  const evtContainer = new TextContainerProperty({
+    containerID: CONTAINER.EVENT_TEXT,
+    containerName: CONTAINER_NAMES.EVENT_TEXT,
+    xPosition: 0,
+    yPosition: 0,
+    width: 576,
+    height: 288,
+    isEventCapture: 1,
+    content: ' ',
+    paddingLength: 0,
+  })
+
+  const displayContainer = new TextContainerProperty({
+    containerID: CONTAINER.DISPLAY_TEXT,
+    containerName: CONTAINER_NAMES.DISPLAY_TEXT,
+    xPosition: 250,
+    yPosition: 80,
+    width: 400,
+    height: 128,
+    isEventCapture: 0,
+    content: text,
+    paddingLength: 8,
+  })
+
+  await setPage({
+    containerTotalNum: 3,
+    textObject: [evtContainer, displayContainer, makeTimeContainer(3)],
+  })
+  log(`Centered text: ${text.replace(/\n/g, ' | ')}`)
+}
+
+// ─── Quad View page ──────────────────────────────────────────────────────────
+// Displays up to 4 favorite camera images in a 2×2 tiled layout.
+// Reuses FULL_VIEW_TILES positioning. Tiles with no data are left blank.
+
+export async function showQuadView(tiles: number[][], label: string): Promise<void> {
+  const evtContainer = new TextContainerProperty({
+    containerID: CONTAINER.EVENT_TEXT,
+    containerName: CONTAINER_NAMES.EVENT_TEXT,
+    xPosition: 250,
+    yPosition: 4,
+    width: 200,
+    height: 288,
+    isEventCapture: 1,
+    content: ' ',
+    paddingLength: 0,
+  })
+
+  const imageContainers = FULL_VIEW_TILES.map(({ id, name, x, y }) =>
+    new ImageContainerProperty({
+      containerID: id,
+      containerName: name,
+      xPosition: x,
+      yPosition: y,
+      width: 200,
+      height: 100,
+    })
+  )
+
+  // ID=6: bottom-center label ("Page X/N")
+  _labelContainerID = 6
+  const labelContainer = new TextContainerProperty({
+    containerID: 6,
+    containerName: LABEL_CONTAINER_NAME,
+    xPosition: 250,
+    yPosition: 250,
+    width: 100,
+    height: 38,
+    isEventCapture: 0,
+    content: ' ',
+    paddingLength: 0,
+  })
+
+  const ok = await setPage({
+    containerTotalNum: 7,
+    textObject: [evtContainer, labelContainer, makeTimeContainer(7)],
+    imageObject: imageContainers,
+  })
+
+  if (ok) {
+    const bridge = await getBridge()
+    for (let i = 0; i < FULL_VIEW_TILES.length; i++) {
+      const { id, name } = FULL_VIEW_TILES[i]
+      const tileData = tiles[i]
+      if (!tileData?.length) continue
+      const result = await bridge.updateImageRawData(new ImageRawDataUpdate({
+        containerID: id,
+        containerName: name,
+        imageData: tileData,
+      }))
+      log(`Quad tile ${i}: ${result} — ${label}`)
+    }
+  }
+}
+
+// Sends up to 4 tile images to an already-built quad-view page.
+export async function sendQuadTiles(tiles: number[][], label: string): Promise<void> {
+  const bridge = await getBridge()
+  for (let i = 0; i < FULL_VIEW_TILES.length; i++) {
+    const { id, name } = FULL_VIEW_TILES[i]
+    const tileData = tiles[i]
+    if (!tileData?.length) continue
+    const result = await bridge.updateImageRawData(new ImageRawDataUpdate({
+      containerID: id,
+      containerName: name,
+      imageData: tileData,
+    }))
+    log(`Quad tile ${i}: ${result} — ${label}`)
+  }
+}
+
 // ─── Camera View page ─────────────────────────────────────────────────────────
 
 export async function showCameraView(
@@ -194,7 +494,7 @@ export async function showCameraView(
 ): Promise<void> {
   const cam = cameras[cameraIndex]
 
-  // ID=1: invisible full-screen event capture; also used for fallback error text
+  // ID=1: invisible full-screen event capture
   const evtContainer = new TextContainerProperty({
     containerID: CONTAINER.EVENT_TEXT,
     containerName: CONTAINER_NAMES.EVENT_TEXT,
@@ -217,22 +517,34 @@ export async function showCameraView(
     height: 100,
   })
 
+  // ID=3: bottom-center label ("X/N" or error text)
+  _labelContainerID = 3
+  const labelContainer = new TextContainerProperty({
+    containerID: 3,
+    containerName: LABEL_CONTAINER_NAME,
+    xPosition: 265,
+    yPosition: 200,
+    width: 100,
+    height: 60,
+    isEventCapture: 0,
+    content: ' ',
+    paddingLength: 0,
+  })
+
   const ok = await setPage({
-    containerTotalNum: 2,
-    textObject: [evtContainer],
+    containerTotalNum: 4,
+    textObject: [evtContainer, labelContainer, makeTimeContainer(4)],
     imageObject: [imageContainer],
   })
 
   if (ok && imageData.length > 0) {
-    enqueueImageSend(async () => {
-      const bridge = await getBridge()
-      const result = await bridge.updateImageRawData(new ImageRawDataUpdate({
-        containerID: CONTAINER.IMAGE,
-        containerName: CONTAINER_NAMES.IMAGE,
-        imageData,
-      }))
-      log(`Image send: ${result} — ${highway} [${cameraIndex + 1}] ${cam.title}`)
-    })
+    const bridge = await getBridge()
+    const result = await bridge.updateImageRawData(new ImageRawDataUpdate({
+      containerID: CONTAINER.IMAGE,
+      containerName: CONTAINER_NAMES.IMAGE,
+      imageData,
+    }))
+    log(`Image send: ${result} — ${highway} [${cameraIndex + 1}] ${cam.title}`)
   }
 }
 
@@ -252,8 +564,8 @@ export async function showCameraViewFull(
   const evtContainer = new TextContainerProperty({
     containerID: CONTAINER.EVENT_TEXT,
     containerName: CONTAINER_NAMES.EVENT_TEXT,
-    xPosition: 0,
-    yPosition: 0,
+    xPosition: 40,
+    yPosition: 40,
     width: 576,
     height: 288,
     isEventCapture: 1,
@@ -272,70 +584,83 @@ export async function showCameraViewFull(
     })
   )
 
+  // ID=6: bottom-center label "X/N"
+  _labelContainerID = 6
+  const labelContainer = new TextContainerProperty({
+    containerID: 6,
+    containerName: LABEL_CONTAINER_NAME,
+    xPosition: 265,
+    yPosition: 250,
+    width: 100,
+    height: 60,
+    isEventCapture: 0,
+    content: ' ',
+    paddingLength: 0,
+  })
+
   const ok = await setPage({
-    containerTotalNum: 5,
-    textObject: [evtContainer],
+    containerTotalNum: 7,
+    textObject: [evtContainer, labelContainer, makeTimeContainer(7)],
     imageObject: imageContainers,
   })
 
   if (ok && tiles.length === 4) {
-    FULL_VIEW_TILES.forEach(({ id, name }, i) => {
+    const bridge = await getBridge()
+    for (let i = 0; i < FULL_VIEW_TILES.length; i++) {
+      const { id, name } = FULL_VIEW_TILES[i]
       const tileData = tiles[i]
-      if (!tileData?.length) return
-      enqueueImageSend(async () => {
-        const bridge = await getBridge()
-        const result = await bridge.updateImageRawData(new ImageRawDataUpdate({
-          containerID: id,
-          containerName: name,
-          imageData: tileData,
-        }))
-        log(`Tile ${i} send: ${result} — ${highway} [${cameraIndex + 1}] ${cam.title}`)
-      })
-    })
-  }
-}
-
-export function sendCameraImageFull(tiles: number[][], label: string): void {
-  if (tiles.length !== 4) return
-  FULL_VIEW_TILES.forEach(({ id, name }, i) => {
-    const tileData = tiles[i]
-    if (!tileData?.length) return
-    enqueueImageSend(async () => {
-      const bridge = await getBridge()
+      if (!tileData?.length) continue
       const result = await bridge.updateImageRawData(new ImageRawDataUpdate({
         containerID: id,
         containerName: name,
         imageData: tileData,
       }))
-      log(`Tile ${i} send: ${result} — ${label}`)
-    })
-  })
+      log(`Tile ${i} send: ${result} — ${highway} [${cameraIndex + 1}] ${cam.title}`)
+    }
+  }
 }
 
-export function sendCameraImage(imageData: number[], label: string): void {
-  if (imageData.length === 0) return
-  enqueueImageSend(async () => {
-    const bridge = await getBridge()
-    const result = await bridge.updateImageRawData(new ImageRawDataUpdate({
-      containerID: CONTAINER.IMAGE,
-      containerName: CONTAINER_NAMES.IMAGE,
-      imageData,
-    }))
-    log(`Image send: ${result} — ${label}`)
-  })
-}
-
-export async function showImageError(title: string): Promise<void> {
+export async function sendCameraImageFull(tiles: number[][], label: string): Promise<void> {
+  if (tiles.length !== 4) return
   const bridge = await getBridge()
-  const text = `No image available\n${title}`
+  for (let i = 0; i < FULL_VIEW_TILES.length; i++) {
+    const { id, name } = FULL_VIEW_TILES[i]
+    const tileData = tiles[i]
+    if (!tileData?.length) continue
+    const result = await bridge.updateImageRawData(new ImageRawDataUpdate({
+      containerID: id,
+      containerName: name,
+      imageData: tileData,
+    }))
+    log(`Tile ${i} send: ${result} — ${label}`)
+  }
+}
+
+export async function sendCameraImage(imageData: number[], label: string): Promise<void> {
+  if (imageData.length === 0) return
+  const bridge = await getBridge()
+  const result = await bridge.updateImageRawData(new ImageRawDataUpdate({
+    containerID: CONTAINER.IMAGE,
+    containerName: CONTAINER_NAMES.IMAGE,
+    imageData,
+  }))
+  log(`Image send: ${result} — ${label}`)
+}
+
+// Updates the bottom-center label in camera view / quad view.
+// Used for: "3/60" on success, "No image\nCamera Title" on error, "Page 1/2".
+// The label container ID varies by view (e.g. ID 3 in camera view, ID 6 in full-view).
+export async function updateCameraViewText(text: string): Promise<void> {
+  if (_labelContainerID === 0) return
+  const bridge = await getBridge()
   const ok = await bridge.textContainerUpgrade(new TextContainerUpgrade({
-    containerID: CONTAINER.EVENT_TEXT,
-    containerName: CONTAINER_NAMES.EVENT_TEXT,
+    containerID: _labelContainerID,
+    containerName: LABEL_CONTAINER_NAME,
     contentOffset: 0,
     contentLength: text.length,
     content: text,
   }))
-  log(`Error text shown (${ok}): ${title}`)
+  log(`Camera view text (${ok}): ${text.replace(/\n/g, ' | ')}`)
 }
 
 // ─── Event listener ───────────────────────────────────────────────────────────
