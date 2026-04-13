@@ -57,23 +57,6 @@ To sideload for dev: open the Even App on your phone, tap the QR scan button, an
 
 ---
 
-## Packaging for Even Hub
-
-```bash
-npm run build
-evenhub pack app.json dist -o roadview.ehpk
-```
-
-Key `app.json` fields:
-
-| Field | Value |
-| --- | --- |
-| `package_id` | `com.natealmanza.roadview` |
-| `entrypoint` | `index.html` |
-| `permissions` | Network whitelist for all camera image origins |
-
----
-
 ## Features
 
 ### Menu
