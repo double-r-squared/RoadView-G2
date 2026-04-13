@@ -28,6 +28,8 @@ Single image (200x100) or full image view (2x2 tiled, 400x200). Scroll to change
 
 ![Full Image View — alternate angle](./screenshots/large-view-2.png)
 
+>Note: Images taken from simulator, images are easier to see on hardware.
+
 ### Favorites / Quad View
 
 Select favorite cameras in the WebView, then view 4 at a time on the glasses. Scroll to page through them.
