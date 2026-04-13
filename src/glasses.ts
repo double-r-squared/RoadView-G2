@@ -439,7 +439,7 @@ export async function showQuadView(tiles: number[][], label: string): Promise<vo
     containerName: LABEL_CONTAINER_NAME,
     xPosition: 250,
     yPosition: 250,
-    width: 100,
+    width: 200,
     height: 38,
     isEventCapture: 0,
     content: ' ',

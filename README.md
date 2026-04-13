@@ -1,8 +1,38 @@
 # Road View
 
-![logo](./screenshots/logo.png)
-
 A WebView app for the **Even Realities G2** smart glasses that streams live WSDOT highway camera feeds directly to the display.
+
+## Screenshots
+
+### Main Menu
+
+Tap to start, then scroll to select Favorites or Browse.
+
+![Main Menu](./screenshots/main-menu.png)
+
+### Browse Flow
+
+Select a highway from the paginated list, scroll through cameras, and tap to view.
+
+| Highway List | Camera Detail |
+| :---: | :---: |
+| ![Highway List](./screenshots/road-list.png) | ![Camera Detail](./screenshots/road-detail.png) |
+
+### Camera View
+
+Single image (200x100) or full image view (2x2 tiled, 400x200). Scroll to change cameras, tap to refresh.
+
+| Standard View | Full Image View |
+| :---: | :---: |
+| ![Standard View](./screenshots/small-view.png) | ![Full Image View](./screenshots/large-view-1.png) |
+
+![Full Image View — alternate angle](./screenshots/large-view-2.png)
+
+### Favorites / Quad View
+
+Select favorite cameras in the WebView, then view 4 at a time on the glasses. Scroll to page through them.
+
+![Quad View](./screenshots/favorites-view.png)
 
 ---
 

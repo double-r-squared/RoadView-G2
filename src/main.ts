@@ -329,7 +329,7 @@ async function enterQuadView(page: number): Promise<void> {
   state = { name: 'quad-view', page }
   const totalPages = Math.ceil(favs.length / QUAD_PAGE_SIZE)
   await showQuadView([], `Page ${page + 1}/${totalPages}`)
-  await updateCameraViewText(`Loading ${Math.min(QUAD_PAGE_SIZE, favs.length)} cameras...`)
+  await updateCameraViewText(`Loading...`)
   await loadQuadPage(favs, page)
 }
 
