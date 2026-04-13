@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Road View</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f0f;
+      color: #e8e8e8;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Main content ── */
+    #app {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      gap: 32px;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    h1 span {
+      color: #4a9eff;
+    }
+
+    /* ── Setup card ── */
+    #setup-card {
+      background: #1a1a1a;
+      border: 1px solid #2e2e2e;
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .field-label {
+      font-size: 0.8rem;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    #access-code {
+      width: 100%;
+      padding: 10px 12px;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #e8e8e8;
+      font-size: 1rem;
+      font-family: monospace;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    #access-code:focus {
+      border-color: #4a9eff;
+    }
+
+    .hint {
+      font-size: 0.75rem;
+      color: #555;
+    }
+
+    .hint a {
+      color: #4a9eff;
+      text-decoration: none;
+    }
+
+    /* ── Buttons ── */
+    .btn-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, background 0.15s;
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    #btn-connect {
+      background: #2a2a2a;
+      color: #e8e8e8;
+      border: 1px solid #3a3a3a;
+    }
+
+    #btn-connect:hover:not(:disabled) {
+      background: #333;
+    }
+
+    #btn-submit {
+      background: #4a9eff;
+      color: #fff;
+    }
+
+    #btn-submit:hover:not(:disabled) {
+      background: #3a8eef;
+    }
+
+    /* ── Status bar ── */
+    #status {
+      font-size: 0.8rem;
+      min-height: 1.2em;
+      text-align: center;
+      color: #888;
+    }
+
+    #status.error { color: #ff6b6b; }
+    #status.ok    { color: #6bffb8; }
+    #status.info  { color: #4a9eff; }
+
+    /* ── Device info ── */
+    #device-info {
+      font-size: 0.75rem;
+      color: #555;
+      font-family: monospace;
+      text-align: center;
+      min-height: 1em;
+    }
+
+    /* ── Debug panel ── */
+    #debug-panel {
+      width: 100%;
+      background: #0a0a0a;
+      border-top: 1px solid #2a2a2a;
+      flex-shrink: 0;
+    }
+
+    #debug-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 0.75rem;
+      color: #555;
+    }
+
+    #debug-header:hover {
+      color: #888;
+    }
+
+    #debug-toggle-icon {
+      font-size: 0.6rem;
+      transition: transform 0.2s;
+    }
+
+    #debug-panel.collapsed #debug-toggle-icon {
+      transform: rotate(-90deg);
+    }
+
+    #debug-body {
+      overflow: hidden;
+      max-height: 200px;
+      transition: max-height 0.2s ease;
+    }
+
+    #debug-panel.collapsed #debug-body {
+      max-height: 0;
+    }
+
+    #debug-list {
+      list-style: none;
+      overflow-y: auto;
+      max-height: 200px;
+      padding: 0 16px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    #debug-list li {
+      font-size: 0.7rem;
+      font-family: monospace;
+      color: #4a7;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    #debug-list li:last-child {
+      color: #6bffb8;
+    }
+
+    .debug-actions {
+      padding: 4px 16px 8px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .debug-actions button {
+      flex: none;
+      padding: 3px 10px;
+      font-size: 0.65rem;
+      font-weight: 400;
+      background: #1a1a1a;
+      border: 1px solid #2e2e2e;
+      border-radius: 4px;
+      color: #666;
+    }
+
+    .debug-actions button:hover {
+      color: #aaa;
+      background: #222;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="app">
+    <h1>Road <span>View</span></h1>
+
+    <div id="setup-card">
+      <div>
+        <div class="field-label">WSDOT Access Code</div>
+        <input
+          id="access-code"
+          type="text"
+          placeholder="Enter your access code"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <div class="hint" style="margin-top: 6px;">
+          Don't have one? <a href="https://wsdot.wa.gov/traffic/api/" target="_blank">Get your free access code</a>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button id="btn-connect" type="button">Connect Glasses</button>
+        <button id="btn-submit" type="button">Load Cameras</button>
+      </div>
+
+      <div id="status"></div>
+      <div id="device-info"></div>
+
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding-top:4px;">
+        <input id="full-view-toggle" type="checkbox" style="width:16px;height:16px;accent-color:#4a9eff;cursor:pointer;" />
+        <span style="font-size:0.85rem;font-weight:600;">Full Image View</span>
+      </label>
+      <div style="font-size:0.72rem;color:#666;line-height:1.4;">
+        Tiles the image across four 200×100 containers for a larger view.
+        Loads will be slower and you may see screen tearing as tiles arrive one by one.
+      </div>
+    </div>
+  </div>
+
+  <!-- Debug panel -->
+  <div id="debug-panel" class="collapsed">
+    <div id="debug-header">
+      <span>Debug Log</span>
+      <span id="debug-toggle-icon">&#9660;</span>
+    </div>
+    <div id="debug-body">
+      <div class="debug-actions">
+        <button id="btn-clear-log">Clear</button>
+      </div>
+      <ul id="debug-list"></ul>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

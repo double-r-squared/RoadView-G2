@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Packaged app
+*.ehpk
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# API response dumps (large, regenerable)
+cameras-response.json
+
+# Environment / secrets
+.env
+.env.*

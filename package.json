@@ -1,0 +1,17 @@
+{
+  "name": "road-view",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "qr": "evenhub qr --url http://100.108.195.13:5173"
+  },
+  "dependencies": {
+    "@evenrealities/even_hub_sdk": "^0.0.9",
+    "@evenrealities/evenhub-cli": "^0.1.11",
+    "vite": "^8.0.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.3.0"
+  }
+}
