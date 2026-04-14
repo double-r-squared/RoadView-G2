@@ -15,8 +15,9 @@
       "name": "network",
       "desc": "Fetches WSDOT highway camera metadata and live camera images from WSDOT and third-party hosts.",
       "whitelist": [
-        "http://100.108.195.13:5173",
+        "https://evenhub.evenrealities.com",
         "https://wsdot.wa.gov",
+        "https://www.wsdot.wa.gov",
         "https://images.wsdot.wa.gov",
         "https://cam.pangbornairport.com",
         "https://w28webcam.blob.core.windows.net",
