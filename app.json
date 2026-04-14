@@ -5,31 +5,28 @@
   "version": "1.5.0",
   "min_app_version": "0.1.0",
   "min_sdk_version": "0.0.9",
-  "tagline": "Check highway conditions on your smart glasses before you head out",
-  "description": "Browse and view live WSDOT highway camera feeds on your Even Realities G2 smart glasses. Navigate by highway, scroll through cameras, and view snapshots in standard or full-tiled mode.",
-  "author": "Nate Almanza",
   "entrypoint": "index.html",
-  "supported_languages": ["en"],
   "permissions": [
     {
       "name": "network",
       "desc": "Fetches WSDOT highway camera metadata and live camera images from WSDOT and third-party hosts.",
       "whitelist": [
-        "https://evenhub.evenrealities.com",
-        "https://wsdot.wa.gov",
-        "https://www.wsdot.wa.gov",
-        "https://images.wsdot.wa.gov",
-        "https://cam.pangbornairport.com",
-        "https://w28webcam.blob.core.windows.net",
-        "https://flyykm.com",
-        "https://assets2.webcam.io",
-        "https://www.nps.gov",
-        "https://sunmountainlodge.com",
-        "https://www.seattle.gov",
-        "https://www.tripcheck.com",
-        "https://home.lewiscounty.com",
-        "https://tripcheck.com"
+        "https://evenhub.evenrealities.com/*",
+        "https://wsdot.wa.gov/*",
+        "https://www.wsdot.wa.gov/*",
+        "https://images.wsdot.wa.gov/*",
+        "https://cam.pangbornairport.com/*",
+        "https://w28webcam.blob.core.windows.net/*",
+        "https://flyykm.com/*",
+        "https://assets2.webcam.io/*",
+        "https://www.nps.gov/*",
+        "https://sunmountainlodge.com/*",
+        "https://www.seattle.gov/*",
+        "https://www.tripcheck.com/*",
+        "https://home.lewiscounty.com/*",
+        "https://tripcheck.com/*"
       ]
     }
-  ]
+  ],
+  "supported_languages": ["en"]
 }
