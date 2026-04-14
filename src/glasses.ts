@@ -150,9 +150,11 @@ export async function showHighwayList(highways: string[], page: number): Promise
     }),
   })
 
-  await setPage({ containerTotalNum: 1, listObject: [list] })
-  _timeContainerID = 0  // list must be sole container — no time display
+  // Clear before setPage — prevents the 30s time interval from calling
+  // textContainerUpgrade on a now-destroyed container during the rebuild await.
+  _timeContainerID = 0
   _labelContainerID = 0
+  await setPage({ containerTotalNum: 1, listObject: [list] })
   log(`Highway list page ${page}: ${items.length} items`)
 }
 
@@ -222,80 +224,14 @@ function buildBrowseText(highway: string, idx: number, total: number, title: str
   return `${highway}\nCamera ${idx + 1} / ${total}\n${title}\nID: ${cameraID}`
 }
 
-// ─── Main page layout (splash + menu share the same 3-container setup) ──────
+// ─── Menu page layout ────────────────────────────────────────────────────────
 // ID 1: invisible full-screen event capture (receives scroll/click)
-// ID 2: logo image at top
+// ID 2: logo image
 // ID 3: visible text — NOT event capture (avoids scroll bounce)
-//
-// Splash sets text to "tap to start". Menu sets it to "> Quad View / Browse".
-// Transitioning between them is just a textContainerUpgrade on ID 3 — no rebuild,
-// no image re-send.
-
-export async function showSplash(imageData: number[]): Promise<void> {
-  const evtContainer = new TextContainerProperty({
-    containerID: CONTAINER.EVENT_TEXT,
-    containerName: CONTAINER_NAMES.EVENT_TEXT,
-    xPosition: 0,
-    yPosition: 0,
-    width: 576,
-    height: 288,
-    isEventCapture: 1,
-    content: ' ',
-    paddingLength: 0,
-  })
-
-  const textObj = new TextContainerProperty({
-    containerID: CONTAINER.MENU_TEXT,
-    containerName: CONTAINER_NAMES.MENU_TEXT,
-    xPosition: 230,
-    yPosition: 120,
-    width: 300,
-    height: 120,
-    isEventCapture: 0,
-    content: '  tap to start',
-    paddingLength: 8,
-  })
-
-  const imageObj = new ImageContainerProperty({
-    containerID: CONTAINER.MENU_LOGO,
-    containerName: CONTAINER_NAMES.MENU_LOGO,
-    xPosition: 180,
-    yPosition: 30,
-    width: 200,
-    height: 100,
-  })
-
-  const ok = await setPage({
-    containerTotalNum: 4,
-    textObject: [evtContainer, textObj, makeTimeContainer(4)],
-    imageObject: [imageObj],
-  })
-
-  if (ok && imageData.length > 0) {
-    const bridge = await getBridge()
-    const result = await bridge.updateImageRawData(new ImageRawDataUpdate({
-      containerID: CONTAINER.MENU_LOGO,
-      containerName: CONTAINER_NAMES.MENU_LOGO,
-      imageData,
-    }))
-    log(`Splash screen: ${result}`)
-  }
-}
-
-// Full page rebuild — used when returning from a sub-view (highway list, camera, quad).
-// Re-sends the image since the page layout was destroyed by the sub-view.
+// ID 4: time display
 
 export async function showMenu(imageData: number[], menuIndex: number): Promise<void> {
-  // Clear stale text from previous view BEFORE rebuilding (e.g. "Page 1/2" from quad view).
-  // Must happen while the old page is still active so the SDK actually processes the clear.
   const bridge = await getBridge()
-  await bridge.textContainerUpgrade(new TextContainerUpgrade({
-    containerID: CONTAINER.EVENT_TEXT,
-    containerName: CONTAINER_NAMES.EVENT_TEXT,
-    contentOffset: 0,
-    contentLength: 40,
-    content: ' '.repeat(40),
-  }))
 
   const evtContainer = new TextContainerProperty({
     containerID: CONTAINER.EVENT_TEXT,
@@ -349,7 +285,6 @@ export async function showMenu(imageData: number[], menuIndex: number): Promise<
 }
 
 // Text-only update for the visible text container (MENU_TEXT, ID 3).
-// Works for both splash and menu since they share the same layout.
 export async function updateMenuText(text: string): Promise<void> {
   const bridge = await getBridge()
   const ok = await bridge.textContainerUpgrade(new TextContainerUpgrade({
@@ -758,6 +693,13 @@ export async function listenGlassesEvents(handler: GlassesEventHandler): Promise
       }
     }
   })
+}
+
+// ─── Exit dialogue ────────────────────────────────────────────────────────────
+
+export async function showExitDialogue(): Promise<void> {
+  const bridge = await getBridge()
+  await bridge.shutDownPageContainer(1)
 }
 
 // ─── Device status ────────────────────────────────────────────────────────────

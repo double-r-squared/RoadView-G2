@@ -8,7 +8,6 @@ export interface CameraEntry {
 export type CameraStore = Record<string, CameraEntry[]>
 
 export type AppState =
-  | { name: 'setup' }
   | { name: 'menu'; menuIndex: number }
   | { name: 'highway-list'; highways: string[]; page: number }
   | { name: 'camera-browse'; highway: string; cameras: CameraEntry[]; cameraIndex: number }

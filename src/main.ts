@@ -1,6 +1,6 @@
 import { initDebugPanel, log } from './debug'
 import {
-  encodeSplashImage,
+  encodeMenuLogo,
   fetchAllCameras,
   fetchCameraImageDataCached,
   fetchCameraImageFresh,
@@ -25,7 +25,7 @@ import {
   updateCameraViewText,
   updateMenuText,
   updateTime,
-  showSplash,
+  showExitDialogue,
   updateBrowseText,
 } from './glasses'
 import {
@@ -43,7 +43,7 @@ import {
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-let state: AppState = { name: 'setup' }
+let state: AppState = { name: 'menu', menuIndex: 0 }
 let cameras: CameraStore = {}
 let cachedAccessCode = ''
 
@@ -60,8 +60,8 @@ let activeFullView = false
 // Persisted via bridge.setLocalStorage so they survive sessions.
 let favoriteIDs: number[] = []
 
-// Cached splash image bytes — encoded once at boot.
-let splashImageData: number[] = []
+// Cached menu logo bytes — encoded once at boot.
+let menuLogoData: number[] = []
 
 function scheduleImageFetch(imageURL: string, title: string, cameraID: number): void {
   if (scrollTimer !== null) clearTimeout(scrollTimer)
@@ -219,7 +219,7 @@ function resolveFavorites(): CameraEntry[] {
 
 async function goToMenu(): Promise<void> {
   state = { name: 'menu', menuIndex: 0 }
-  await showMenu(splashImageData, 0)
+  await showMenu(menuLogoData, 0)
 }
 
 // ─── Connect Glasses button ───────────────────────────────────────────────────
@@ -244,20 +244,18 @@ $btnConnect.addEventListener('click', async () => {
 })
 
 // ─── Load Cameras ────────────────────────────────────────────────────────────
-// Shared by both the WebView button and glasses tap-to-start.
-// When fromSplash=true, we just update text (splash layout is still active).
-// When fromSplash=false (e.g. button pressed after returning), we do a full rebuild.
+// Called from the WebView submit button. Updates menu text on glasses to show
+// loading state and result.
 
-async function loadCameras(fromSplash: boolean): Promise<void> {
+async function loadCameras(): Promise<void> {
   const code = $accessCode.value.trim()
   if (!code) {
     setStatus('Please enter your access code', 'error')
-    if (fromSplash) await updateMenuText('No access code\ntap to retry')
     return
   }
 
   setLoading(true)
-  if (fromSplash) await updateMenuText('  Loading...')
+  await updateMenuText('  Loading...')
 
   try {
     const bridge = await getBridge()
@@ -269,12 +267,8 @@ async function loadCameras(fromSplash: boolean): Promise<void> {
       setStatus(`${cameraCount} cameras loaded — menu on glasses`, 'ok')
       $favoritesCard.classList.remove('hidden')
       buildFavoritesTree()
-      if (fromSplash) {
-        state = { name: 'menu', menuIndex: 0 }
-        await updateMenuText(buildMenuText(0))
-      } else {
-        await goToMenu()
-      }
+      state = { name: 'menu', menuIndex: 0 }
+      await updateMenuText(buildMenuText(0))
       return
     }
 
@@ -293,27 +287,22 @@ async function loadCameras(fromSplash: boolean): Promise<void> {
     $favoritesCard.classList.remove('hidden')
     buildFavoritesTree()
 
-    if (fromSplash) {
-      state = { name: 'menu', menuIndex: 0 }
-      await updateMenuText(buildMenuText(0))
-    } else {
-      await goToMenu()
-    }
+    state = { name: 'menu', menuIndex: 0 }
+    await updateMenuText(buildMenuText(0))
   } catch (err) {
     const name = err instanceof Error ? err.name : 'Error'
     const msg  = err instanceof Error ? err.message : String(err)
     setStatus(`${name}: ${msg}`, 'error')
     log(`Load error [${name}]: ${msg}`)
     if (err instanceof Error && err.stack) log(`Stack: ${err.stack}`)
-    if (fromSplash) await updateMenuText('Error\ntap to retry')
+    await updateMenuText('Error\ntap to retry')
   } finally {
     setLoading(false)
   }
 }
 
 $btnSubmit.addEventListener('click', () => {
-  const fromSplash = state.name === 'setup'
-  loadCameras(fromSplash)
+  loadCameras()
 })
 
 // ─── Quad View helpers ───────────────────────────────────────────────────────
@@ -365,18 +354,15 @@ async function handleGlassesEvent(
 ): Promise<void> {
   log(`Event: ${JSON.stringify(event)} | state: ${state.name}`)
 
-  // ── Setup (splash screen — tap to start) ────────────────────────────
-  if (state.name === 'setup') {
-    if (event.type === 'click') {
-      log('[setup] Tap to start — loading cameras')
-      await loadCameras(true)
-    }
-    return
-  }
-
   // ── Menu (text-based, scroll to select, click to confirm) ────────────
   if (state.name === 'menu') {
     const { menuIndex } = state
+
+    if (event.type === 'double-click') {
+      log('[menu] Double-tap on root page — showing exit dialogue')
+      await showExitDialogue()
+      return
+    }
 
     if (event.type === 'scroll-up' || event.type === 'scroll-down') {
       const next = menuIndex === 0 ? 1 : 0
@@ -671,13 +657,14 @@ async function boot(): Promise<void> {
   try {
     const bridge = await getBridge()
 
-    // Encode splash image at boot — menu reuses the same page layout
+    // Encode menu logo and show menu directly
     try {
-      splashImageData = await encodeSplashImage()
-      await showSplash(splashImageData)
+      menuLogoData = await encodeMenuLogo()
     } catch (err) {
-      log(`Splash error: ${err instanceof Error ? err.message : String(err)}`)
+      log(`Logo error: ${err instanceof Error ? err.message : String(err)}`)
     }
+    state = { name: 'menu', menuIndex: 0 }
+    await showMenu(menuLogoData, 0)
 
     // Restore persisted favorites
     await loadFavorites()

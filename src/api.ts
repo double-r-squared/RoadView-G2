@@ -1,18 +1,18 @@
 /// <reference types="vite/client" />
 import type { CameraStore } from './types'
 import { log } from './debug'
-import splashUrl from './assets/highway--v2.jpg'
+import menuLogoUrl from './assets/highway--v2.jpg'
 
-// Encode the bundled splash image to PNG bytes for the glasses display.
+// Encode the bundled menu logo to PNG bytes for the glasses display.
 // Loads via Image element directly (no fetch) so it works in packaged WebViews
 // where fetch() for local bundled assets may be restricted.
 // Times out after 3s so boot is never blocked.
-export function encodeSplashImage(): Promise<number[]> {
-  log(`[splash] encoding local asset: ${splashUrl}`)
+export function encodeMenuLogo(): Promise<number[]> {
+  log(`[logo] encoding local asset: ${menuLogoUrl}`)
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      log('[splash] timed out after 3s')
-      reject(new Error('Splash image load timed out'))
+      log('[logo] timed out after 3s')
+      reject(new Error('Menu logo load timed out'))
     }, 3000)
 
     const img = new Image()
@@ -30,7 +30,7 @@ export function encodeSplashImage(): Promise<number[]> {
           b.arrayBuffer()
             .then((ab) => {
               const data = Array.from(new Uint8Array(ab))
-              log(`[splash] encoded — ${data.length} bytes`)
+              log(`[logo] encoded — ${data.length} bytes`)
               resolve(data)
             })
             .catch(reject)
@@ -40,10 +40,10 @@ export function encodeSplashImage(): Promise<number[]> {
     }
     img.onerror = () => {
       clearTimeout(timer)
-      log('[splash] Image element onerror fired')
-      reject(new Error('Splash image failed to load'))
+      log('[logo] Image element onerror fired')
+      reject(new Error('Menu logo failed to load'))
     }
-    img.src = splashUrl
+    img.src = menuLogoUrl
   })
 }
 

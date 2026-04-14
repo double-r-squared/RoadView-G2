@@ -2,7 +2,7 @@
   "package_id": "com.natealmanza.roadview",
   "edition": "202601",
   "name": "Road View",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "min_app_version": "2.1.0",
   "min_sdk_version": "0.0.9",
   "entrypoint": "index.html",
