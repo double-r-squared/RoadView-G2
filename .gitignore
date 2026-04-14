@@ -23,3 +23,6 @@ cameras-response.json
 # Environment / secrets
 .env
 .env.*
+
+# Reference projects
+workingExample/

@@ -50,23 +50,32 @@ export function encodeSplashImage(): Promise<number[]> {
 // In dev mode (QR / npm run dev) the Even App loads the page without reading
 // app.json, so no network permissions are granted and all external fetch()
 // calls are blocked by the WebView. We route through the Vite dev server proxy
-// instead. In a production build, use the real WSDOT endpoints directly.
+// instead. In production, route through the Cloudflare Worker CORS proxy
+// because the WSDOT API doesn't return CORS headers.
 const IS_DEV = import.meta.env.DEV
 
-const WSDOT_BASE = IS_DEV
-  ? '/proxy/wsdot'
-  : 'https://wsdot.wa.gov/Traffic/api/HighwayCameras/HighwayCamerasREST.svc'
+const CORS_PROXY = 'https://roadview-proxy.roadview.workers.dev/proxy?url='
 
-log(`[api] mode=${IS_DEV ? 'dev (proxied)' : 'prod (direct)'} base=${WSDOT_BASE}`)
+const WSDOT_API_BASE = 'https://wsdot.wa.gov/Traffic/api/HighwayCameras/HighwayCamerasREST.svc'
+
+log(`[api] mode=${IS_DEV ? 'dev (proxied)' : 'prod (worker)'}`)
+
+// Builds the fetch URL for the WSDOT camera list API.
+// Dev: Vite proxy. Prod: Cloudflare Worker CORS proxy.
+function toApiURL(path: string): string {
+  if (IS_DEV) return `/proxy/wsdot${path}`
+  return `${CORS_PROXY}${encodeURIComponent(`${WSDOT_API_BASE}${path}`)}`
+}
 
 // Rewrites image URLs for the current environment at fetch time.
-// In dev: proxy through Vite. In prod: ensure canonical URLs (fixes stale dev cache).
+// In dev: proxy through Vite. In prod: route through Cloudflare Worker CORS proxy.
 function toFetchURL(raw: string): string {
   if (IS_DEV) {
     return raw.replace('https://images.wsdot.wa.gov', '/proxy/images')
   }
-  // Production — fix any stale proxied URLs left in localStorage from dev sessions
-  return raw.replace(/^\/proxy\/images/, 'https://images.wsdot.wa.gov')
+  // Production — fix any stale proxied URLs from dev, then wrap in CORS proxy
+  const canonical = raw.replace(/^\/proxy\/images/, 'https://images.wsdot.wa.gov')
+  return `${CORS_PROXY}${encodeURIComponent(canonical)}`
 }
 
 interface WSDOTCamera {
@@ -80,7 +89,8 @@ interface WSDOTCamera {
 }
 
 export async function fetchAllCameras(accessCode: string): Promise<CameraStore> {
-  const url = `${WSDOT_BASE}/GetCamerasAsJson?AccessCode=${encodeURIComponent(accessCode)}`
+  const url = toApiURL(`/GetCamerasAsJson?AccessCode=${encodeURIComponent(accessCode)}`)
+
   log(`[fetch] GET ${url}`)
 
   let res: Response
